@@ -1,0 +1,360 @@
+.data
+8
+0
+9
+0x100
+0x140
+0x200
+1,-1	// ball movement vectors
+3,6
+3,7
+4,7 //Right paddle pos
+0,0 //Bricks position
+1,0
+2,0
+3,0
+4,0
+5,0
+6,0
+7,0
+0,1
+1,1
+2,1
+3,1
+4,1
+5,1
+6,1
+7,1
+-1,-1
+0,0
+
+
+
+.text
+	/*
+	Spisak registara:
+	R0 - tmp register
+	R1 - tmp chunk x
+	R2 - tmp chunk y
+	R3 - color
+	R4 - p_ball_paddle_and_bricks
+	R5 - p_pb_dec
+	R6 - p_frame_sync
+	R7 - p_rgb_matrix
+*/
+
+begin:
+	inc R0,R0 // adresa = 1
+	inc R0,R0 // adresa = 2
+	inc R0,R0 // adresa = 3
+	ld R7,R0  // R7 <- p_rgb_matrix
+	inc R0,R0 // adresa = 4
+	ld R6,R0 // R6 <- p_frame_sync
+	inc R0,R0 // adresa = 5
+	ld R5,R0 // R5 <- p_pb_dec
+	inc R3,R3  // color = RED
+
+frame_sync_rising_edge:
+frame_sync_wait_0:
+	ld R0, R6                   ;; R0 <- p_frame_sync
+	jmpnz frame_sync_wait_0
+frame_sync_wait_1:
+	ld R0, R6                   ;; R0 <- p_frame_sync
+	jmpz frame_sync_wait_1
+
+	
+draw_ball:
+	sub R0,R0,R0  // adresa = 0
+	ld R4,R0       	//R4 <- p_ball_paddle_and_bricks
+	shl R3,R3 		//color = GREEN
+	shl R3,R3    		//color = BLUE
+	ld R1,R4			//R1 <- x
+	inc R4,R4
+	ld R2,R4			//R2 <- y
+	inc R4,R4
+	shl R2,R2
+	shl R2,R2
+	shl R2,R2
+	add R2,R2,R1
+	add R2,R2,R7
+	st R3,R2			// R3 -> p_rgb_matrix[y][x]\
+	jmp draw_paddle
+draw_paddle:
+	shr R3, R3		// color = GREEN
+	ld R1, R4
+	inc R4, R4
+	ld R2, R4
+	inc R4, R4
+	shl R2,R2
+	shl R2,R2
+	shl R2,R2
+	add R2,R2,R1
+	add R2,R2,R7
+	st R3,R2			// R3 -> p_rgb_matrix[y][x]
+draw_paddle_2:
+	ld R1, R4
+	inc R4, R4
+	ld R2, R4
+	inc R4, R4
+	shl R2,R2
+	shl R2,R2
+	shl R2,R2
+	add R2,R2,R1
+	add R2,R2,R7
+	st R3,R2			// R3 -> p_rgb_matrix[y][x]
+draw_bricks:
+	sub R3, R3, R3
+	inc R3, R3
+	ld R1,R4			//R1 <- x
+	jmps draw_ball_paddle_bricks_end
+	inc R4,R4
+	ld R2,R4			//R2 <- y
+	inc R4,R4
+	shl R2,R2
+	shl R2,R2
+	shl R2,R2
+	add R2,R2,R1
+	add R2,R2,R7
+	st R3,R2			// R3 -> p_rgb_matrix[y][x]
+	jmp draw_bricks
+draw_ball_paddle_bricks_end:
+count_frames_begin:
+	sub R0, R0, R0              ;; addr = 0
+	inc R0, R0
+	ld R1, R0                   ;; R1 <- frame_cnt
+	inc R0, R0
+	ld R2, R0                   ;; R2 <- frames_per_heartbeat
+	dec R0, R0
+	inc R1, R1                  ;; frame_cnt++;
+	sub R2, R2, R1              ;; frame_cnt == frames_per_heartbeat
+	jmpz count_frames_heatbeat  ;; Jump if equal.
+	st R1, R0                   ;; R1 -> frame_cnt
+	jmp frame_sync_rising_edge
+count_frames_heatbeat:
+	sub R1, R1, R1
+	st R1, R0                   ;; R1 i.e. 0 -> frame_cnt
+count_frames_end:
+
+
+collision_detection:
+	sub R0, R0, R0
+	ld R0, R0		;; R0 = 8
+	dec R0, R0     ;; R0 = 7
+	dec R0, R0		;; R0 = 6
+	
+	ld R3, R0		;; R3 = ball_vector_x
+	inc R0, R0 		;; R0 = 7
+	ld R4, R0		;; R4 = ball_vector_y
+	inc R0, R0		;; R0 = 8
+	ld R1, R0		;; R1 = ball.x
+	inc R0, R0
+	ld R2, R0		;; R2 = ball.y
+	
+	add R2,R2,R4	;; new ball.y = 5
+	add R1,R1,R3	;; new ball.x = 4
+	
+	
+	jmpns check_wall_collision_x_ball_right_wall
+	;; if ball.x > 7 
+	sub R1, R1, R1
+	
+	;; change ball_x_vector
+	sub R0,R0,R0
+	ld R0,R0		;;R0 = 8
+	dec R0,R0
+	dec R0,R0	;;R0 = 6
+	
+	sub R4, R4, R4
+	dec R4,R4		;;R4 = -1;
+	st R4, R0
+	jmp check_wall_collision_end
+	
+check_wall_collision_x_ball_right_wall:
+	sub R0,R0,R0
+	inc R0, R0
+	shl R0, R0
+	shl R0, R0
+	shl R0, R0
+	dec R0, R0  ;; R0 = 7;
+	sub R0, R0, R1			;; R0 = 3;
+	jmpns check_wall_collision_x_ball_left_wall
+	;; new ball.x < 0
+	sub R1,R1,R1
+	ld R1, R1
+	dec R1, R1
+	
+	;;change ball_x_vector
+	sub R0,R0,R0
+	ld R0, R0
+	dec R0, R0
+	dec R0, R0
+	sub R3,R3,R3
+	inc R3, R3
+	st R3, R0      ;; ball_vector_x = 1
+	jmp check_wall_collision_end
+check_wall_collision_x_ball_left_wall:
+check_wall_collision_end:
+
+paddle_collision_detection:
+	sub R0, R0, R0
+	ld R0, R0		;; R0 = 8
+	dec R0, R0     ;; R0 = 7
+	dec R0, R0		;; R0 = 6
+	
+	ld R3, R0		;; R3 = ball_vector_x
+	inc R0, R0 		;; R0 = 7
+	ld R4, R0		;; R4 = ball_vector_y
+	inc R0, R0		;; R0 = 8
+	ld R1, R0		;; R1 = ball.x
+	inc R0, R0
+	ld R2, R0		;; R2 = ball.y
+	
+	add R2,R2,R4
+	add R1,R1,R3	
+	
+	sub R0, R0, R0
+	ld R0, R0
+	inc R0, R0
+	inc R0, R0  	;; R0 = 10 
+						
+	ld R3, R0		;; R3 -> paddle_pos_x
+	inc R0, R0
+	ld R4, R0		;; R4 -> paddle_pos_y
+	
+	sub R3,R1,R1
+	jmpnz paddle_collision_detection_end
+	sub R3, R4, R2
+	jmpnz first_tile_paddle_collision
+	
+	
+	;; set_ball_move(ball.x++. ball.y--)
+	sub R0, R0, R0
+	ld R0, R0
+	dec R0, R0
+	dec R0, R0
+	sub R3, R3, R3
+	inc R3, R3
+	st R3, R0			;;ball_vector_x = 1
+	inc R0, R0
+	sub R4, R4, R4
+	dec R4, R4
+	st R4, R0		   ;;ball_vector_y = -1
+	jmp paddle_collision_detection_end
+first_tile_paddle_collision:
+	inc R4, R4
+	sub R3, R4, R2
+	jmpnz second_tile_paddle_collision
+	
+	;; change ball_vectors(x--, y++)
+	sub R0, R0, R0
+	ld R0, R0
+	dec R0, R0
+	dec R0, R0
+	sub R3, R3, R3
+	dec R3, R3 		;; R3 = -1
+	st R3, R0
+	inc R0, R0
+	sub R4, R4, R4
+	inc R4, R4
+	st R4, R0		;; R4 = 1
+	jmp paddle_collision_detection_end
+second_tile_paddle_collision:
+	;; GAME IS OVER
+	jmp end
+paddle_collision_detection_end:
+	
+update_ball_position:
+	sub R0,R0,R0
+	inc R0, R0
+	inc R0, R0
+	inc R0, R0			;;R0 = 3
+	shl R0, R0
+	shl R0, R0
+	shl R0, R0
+	shl R0, R0			;;R0 = 48 , ball_move_update
+	
+
+	ld R0,R0			;;R0 = ball_move_update
+	sub R1,R1,R1
+	inc R1,R1
+	shl R1,R1
+	shl R1,R1			;;R1 = 4
+	;;shl R1,R1			;;R1 = 8							;;make the ball move every half a second
+	sub R0,R0,R1		;;new: ball_move_delay - 8        old:R0 = ball_move_delay - 4
+	jmpz skip_ball_movement_delay
+		;;else we increase it,store it and skip it
+		sub R1,R1,R1
+		sub R0, R0, R0
+		inc R0, R0
+		inc R0, R0
+		inc R0, R0			;;R0 = 3
+		shl R0, R0
+		shl R0, R0
+		shl R0, R0
+		shl R0, R0	
+		ld R1,R0
+		inc R1,R1
+		st R1,R0			;;ball_move_delay += 1
+		jmp update_ball_position_end
+	skip_ball_movement_delay:
+	
+	;;Reset the ball movement delay
+	sub R0,R0,R0
+	inc R0, R0
+	inc R0, R0
+	inc R0, R0			;;R0 = 3
+	shl R0, R0
+	shl R0, R0
+	shl R0, R0
+	shl R0, R0			;;R0 = 48
+	sub R1,R1,R1		
+	st R1,R0			;;ball_move_delay 0;
+	
+	
+	sub R0,R0,R0
+	ld R0,R0
+	ld R1,R0			
+	inc R0,R0
+	ld R2,R0			;;R1 = ball.x    R2 = ball.y
+	sub R0,R0,R0
+	ld R0,R0
+	dec R0,R0
+	ld R4,R0
+	dec R0,R0
+	ld R3,R0			;;R3 = ball_move.x    R4 = ball_move.y
+	add R1,R1,R3
+	add R2,R2,R4
+
+
+	sub R0,R0,R0
+	ld R0,R0
+	st R1,R0
+	inc R0,R0
+	st R2,R0
+	
+
+
+
+
+
+update_ball_position_end:
+
+	
+	
+	
+end:
+		sub R0, R0, R0
+	
+	
+	
+	
+	
+	
+
+	 
+	 
+	
+	
+	
+	
+	
